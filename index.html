@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>For My Love</title>
+  <link href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=Montserrat:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Montserrat', sans-serif;
+      background: radial-gradient(circle at 50% 45%, #a8c4e0 0%, #6d92ba 55%, #4a6d94 100%);
+      user-select: none;
+    }
+
+    .vignette {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background: radial-gradient(circle at center, transparent 45%, rgba(20, 36, 58, 0.35) 100%);
+      z-index: 1;
+    }
+
+    /* Kontainer Utama Amplop (z-index 10, di bawah kanvas bunga) */
+    .stage {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+    }
+
+    /* Ukuran amplop proporsional dan lebar */
+    .envelope-custom {
+      width: 340px;
+      max-width: 82vw;
+      cursor: pointer;
+      transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+      filter: drop-shadow(0 18px 28px rgba(22, 38, 60, 0.45));
+    }
+
+    .envelope-custom:hover:not(.opened) {
+      transform: translateY(-6px) scale(1.04);
+    }
+
+    .envelope-custom:active:not(.opened) {
+      transform: scale(0.97);
+    }
+
+    .envelope-custom img {
+      width: 100%;
+      height: auto;
+      object-fit: contain;
+      display: block;
+    }
+
+    /* Kanvas Bunga (z-index 20 agar bunga menimpa & menutupi amplop + teks) */
+    #flowerCanvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 20;
+      pointer-events: none;
+    }
+
+    #flowerCanvas.interactive {
+      pointer-events: auto;
+      cursor: pointer;
+    }
+
+    /* Teks "For My Love" */
+    .love-text {
+      margin-top: 24px;
+      font-family: 'Great Vibes', cursive;
+      font-size: 3.2rem;
+      color: #ffffff;
+      text-shadow: 0 3px 12px rgba(22, 42, 68, 0.55);
+      letter-spacing: 1px;
+    }
+
+    .hint-text {
+      margin-top: 8px;
+      font-size: 0.8rem;
+      color: rgba(255, 255, 255, 0.85);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      animation: pulse 2s infinite ease-in-out;
+      transition: opacity 0.3s ease;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.45; }
+      50% { opacity: 1; }
+    }
+
+    /* Tombol Kontrol Musik di pojok kiri bawah */
+    .music-btn {
+      position: fixed;
+      bottom: 22px;
+      left: 22px;
+      z-index: 30;
+      background: rgba(255, 255, 255, 0.25);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.5);
+      color: #fff;
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      font-size: 1.1rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.35s ease;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
+    }
+
+    .music-btn:hover {
+      background: rgba(255, 255, 255, 0.4);
+      transform: scale(1.08);
+    }
+
+    /* Tombol Ulangi di pojok kanan bawah */
+    .reset-btn {
+      position: fixed;
+      bottom: 22px;
+      right: 22px;
+      z-index: 30;
+      background: rgba(255, 255, 255, 0.25);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.5);
+      color: #fff;
+      padding: 10px 18px;
+      border-radius: 999px;
+      font-size: 0.82rem;
+      font-weight: 500;
+      cursor: pointer;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(10px);
+      transition: all 0.35s ease;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
+    }
+
+    .reset-btn.visible {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateY(0);
+    }
+
+    .reset-btn:hover {
+      background: rgba(255, 255, 255, 0.4);
+      transform: translateY(-2px);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="vignette"></div>
+
+  <!-- Amplop dari file lokal (amplop.png / amplop.jpg di folder yang sama) -->
+  <div class="stage" id="stage">
+    <div class="envelope-custom" id="envelope" title="Klik untuk membuka">
+      <img id="envelopeImg" src="amplop.png" alt="Amplop" />
+    </div>
+    <div class="love-text">For My Love</div>
+    <div class="hint-text" id="hintText">Klik amplopnya</div>
+  </div>
+
+  <!-- Kanvas Bunga di atas amplop -->
+  <canvas id="flowerCanvas"></canvas>
+
+  <!-- Lagu dari folder yang sama (bernama lagu.mp3) -->
+  <audio id="bgMusic" src="lagu.mp3" autoplay loop preload="auto"></audio>
+
+  <!-- Tombol Mute / Unmute & Ulangi -->
+  <button class="music-btn" id="musicBtn" title="Matikan/Nyalakan Musik">🔊</button>
+  <button class="reset-btn" id="resetBtn">↻ Ulangi</button>
+
+  <script>
+    // =========================================================================
+    // FALLBACK OTOMATIS UNTUK FILE AMPLOP LOKAL (PNG / JPG / JPEG)
+    // =========================================================================
+    const envelopeImg = document.getElementById('envelopeImg');
+    const localEnvelopeFiles = ['amplop.jpg', 'amplop.jpeg', 'amplop.webp'];
+    let envTryIdx = 0;
+
+    envelopeImg.onerror = () => {
+      if (envTryIdx < localEnvelopeFiles.length) {
+        envelopeImg.src = localEnvelopeFiles[envTryIdx++];
+      }
+    };
+
+    // =========================================================================
+    // PENGATURAN AUDIO OTOMATIS SEJAK AWAL WEBSITE DIBUKA
+    // =========================================================================
+    const bgMusic = document.getElementById('bgMusic');
+    const musicBtn = document.getElementById('musicBtn');
+    let userMuted = false;
+
+    bgMusic.volume = 0.7;
+
+    function startMusic() {
+      if (userMuted) return;
+      bgMusic.play().then(() => {
+        musicBtn.textContent = '🔊';
+      }).catch(() => {
+        musicBtn.textContent = '🔇';
+      });
+    }
+
+    window.addEventListener('DOMContentLoaded', startMusic);
+    window.addEventListener('load', startMusic);
+
+    ['click', 'touchstart', 'keydown'].forEach((evt) => {
+      document.addEventListener(evt, () => {
+        if (bgMusic.paused && !userMuted) {
+          startMusic();
+        }
+      }, { once: true });
+    });
+
+    musicBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (bgMusic.paused) {
+        userMuted = false;
+        bgMusic.play();
+        musicBtn.textContent = '🔊';
+      } else {
+        userMuted = true;
+        bgMusic.pause();
+        musicBtn.textContent = '🔇';
+      }
+    });
+
+    // =========================================================================
+    // PEMUAT GAMBAR BUNGA DARI IMGBB
+    // =========================================================================
+    function loadImgbbWithFallback(imgElement, id, onReady) {
+      const candidates = [
+        `https://i.ibb.co.com/${id}/image.png`,
+        `https://i.ibb.co.com/${id}/image.jpg`,
+        `https://i.ibb.co/${id}/image.png`,
+        `https://i.ibb.co/${id}/image.jpg`
+      ];
+      let idx = 0;
+
+      imgElement.onload = () => {
+        if (onReady) onReady(imgElement);
+      };
+
+      imgElement.onerror = () => {
+        idx++;
+        if (idx < candidates.length) {
+          imgElement.src = candidates[idx];
+        }
+      };
+
+      imgElement.src = candidates[0];
+    }
+
+    const flowerIds = ['GqNBrpt', 'd0C2WG1L', 'dC0hDWQ'];
+    const flowerSprites = [];
+
+    flowerIds.forEach((id) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      loadImgbbWithFallback(img, id, (loadedImg) => {
+        flowerSprites.push(loadedImg);
+      });
+    });
+
+    // =========================================================================
+    // LOGIKA ANIMASI MEKAR & MENUTUPI AMPLOP HINGGA PENUH
+    // =========================================================================
+    const canvas = document.getElementById('flowerCanvas');
+    const ctx = canvas.getContext('2d');
+    const envelope = document.getElementById('envelope');
+    const hintText = document.getElementById('hintText');
+    const resetBtn = document.getElementById('resetBtn');
+
+    let width, height;
+    let flowers = [];
+    let isOpened = false;
+
+    function resize() {
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    class BloomFlower {
+      constructor(startX, startY, targetX, targetY, delay, maxScale) {
+        this.sprite = flowerSprites[Math.floor(Math.random() * flowerSprites.length)];
+        this.startX = startX;
+        this.startY = startY;
+        this.targetX = targetX;
+        this.targetY = targetY;
+        this.x = startX;
+        this.y = startY;
+        this.delay = delay;
+        this.elapsed = 0;
+        this.duration = 950 + Math.random() * 650;
+        this.maxScale = maxScale;
+        this.scale = 0;
+        this.rotation = (Math.random() - 0.5) * 1.4;
+        this.targetRotation = this.rotation + (Math.random() - 0.5) * 1.2;
+        this.swayOffset = Math.random() * Math.PI * 2;
+      }
+
+      update(dt, time) {
+        this.elapsed += dt;
+        if (this.elapsed < this.delay) return;
+
+        const t = Math.min(1, (this.elapsed - this.delay) / this.duration);
+        const ease = 1 - Math.pow(1 - t, 3);
+
+        this.x = this.startX + (this.targetX - this.startX) * ease;
+        this.y = this.startY + (this.targetY - this.startY) * ease;
+        this.scale = this.maxScale * ease;
+        this.currentRot = this.rotation + (this.targetRotation - this.rotation) * ease
+                        + Math.sin(time * 0.0015 + this.swayOffset) * 0.035;
+      }
+
+      draw(ctx) {
+        if (this.scale <= 0.01 || !this.sprite) return;
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.currentRot);
+        ctx.scale(this.scale, this.scale);
+
+        ctx.shadowColor = 'rgba(20, 12, 38, 0.32)';
+        ctx.shadowBlur = 16;
+        ctx.shadowOffsetY = 5;
+
+        const baseSize = 230;
+        const ratio = this.sprite.naturalWidth && this.sprite.naturalHeight
+          ? this.sprite.naturalWidth / this.sprite.naturalHeight
+          : 1;
+        const drawW = ratio >= 1 ? baseSize : baseSize * ratio;
+        const drawH = ratio >= 1 ? baseSize / ratio : baseSize;
+
+        ctx.drawImage(this.sprite, -drawW / 2, -drawH / 2, drawW, drawH);
+        ctx.restore();
+      }
+    }
+
+    function triggerBloomSequence() {
+      if (flowerSprites.length === 0) return;
+
+      const originX = width / 2;
+      const originY = height / 2 - 20;
+
+      const area = width * height;
+      const totalFlowers = Math.max(160, Math.min(280, Math.floor(area / 4800)));
+
+      // Gelombang 1: Mekar di atas amplop
+      const wave1Count = Math.floor(totalFlowers * 0.25);
+      for (let i = 0; i < wave1Count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = Math.random() * 210;
+        const tx = originX + Math.cos(angle) * dist * 1.25;
+        const ty = originY + Math.sin(angle) * dist * 0.9;
+        const scale = 0.78 + Math.random() * 0.45;
+        flowers.push(new BloomFlower(originX, originY, tx, ty, i * 10, scale));
+      }
+
+      // Gelombang 2: Menyebar ke seluruh bagian layar
+      const wave2Count = Math.floor(totalFlowers * 0.35);
+      for (let i = 0; i < wave2Count; i++) {
+        const tx = Math.random() * width;
+        const ty = Math.random() * height;
+        const scale = 0.85 + Math.random() * 0.5;
+        flowers.push(new BloomFlower(originX, originY, tx, ty, 400 + i * 9, scale));
+      }
+
+      // Gelombang 3: Menutup rapat seluruh layar termasuk amplop & tulisan
+      const wave3Count = totalFlowers - wave1Count - wave2Count;
+      const cols = Math.ceil(Math.sqrt(wave3Count * (width / height)));
+      const rows = Math.ceil(wave3Count / cols);
+      const cellW = width / cols;
+      const cellH = height / rows;
+
+      let idx = 0;
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const tx = (c + 0.5) * cellW + (Math.random() - 0.5) * cellW * 0.85;
+          const ty = (r + 0.5) * cellH + (Math.random() - 0.5) * cellH * 0.85;
+          const scale = 0.95 + Math.random() * 0.55;
+          flowers.push(new BloomFlower(originX, originY, tx, ty, 950 + idx * 8, scale));
+          idx++;
+        }
+      }
+    }
+
+    let lastTime = performance.now();
+    function animate(now) {
+      const dt = now - lastTime;
+      lastTime = now;
+
+      ctx.clearRect(0, 0, width, height);
+
+      for (let i = 0; i < flowers.length; i++) {
+        flowers[i].update(dt, now);
+        flowers[i].draw(ctx);
+      }
+
+      requestAnimationFrame(animate);
+    }
+    requestAnimationFrame(animate);
+
+    envelope.addEventListener('click', () => {
+      if (isOpened) return;
+      isOpened = true;
+      envelope.classList.add('opened');
+      hintText.style.opacity = '0';
+
+      if (bgMusic.paused && !userMuted) {
+        startMusic();
+      }
+
+      triggerBloomSequence();
+      canvas.classList.add('interactive');
+
+      setTimeout(() => {
+        resetBtn.classList.add('visible');
+      }, 2200);
+    });
+
+    canvas.addEventListener('click', (e) => {
+      if (!isOpened || flowerSprites.length === 0) return;
+      for (let i = 0; i < 6; i++) {
+        const f = new BloomFlower(
+          e.clientX,
+          e.clientY,
+          e.clientX + (Math.random() - 0.5) * 140,
+          e.clientY + (Math.random() - 0.5) * 140,
+          i * 30,
+          0.75 + Math.random() * 0.5
+        );
+        f.duration = 550;
+        flowers.push(f);
+      }
+    });
+
+    resetBtn.addEventListener('click', () => {
+      isOpened = false;
+      flowers = [];
+      envelope.classList.remove('opened');
+      hintText.style.opacity = '1';
+      resetBtn.classList.remove('visible');
+      canvas.classList.remove('interactive');
+    });
+  </script>
+</body>
+</html>
